@@ -1,0 +1,26 @@
+replicaCount: 1
+
+image:
+  repository: redis
+  tag: "7.2-alpine"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 6379
+
+# Redis command arguments (empty by default for standard Redis startup)
+args: []
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+persistence:
+  enabled: false
+  storageClass: ""
+  size: 10Mi

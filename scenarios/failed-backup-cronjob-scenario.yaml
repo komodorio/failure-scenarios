@@ -1,0 +1,159 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: anthos-bank
+  labels:
+    application: bank-of-anthos
+    environment: development
+    team: ledger
+    tier: db
+  name: ledger-db-backup-script
+type: Opaque
+stringData:
+  backup.sh: |
+    #!/bin/sh
+    set -e
+
+    # Get current minute
+    CURRENT_MINUTE=$(date +%M)
+
+    echo "================================================"
+    echo "Ledger DB Backup Started"
+    echo "Time: $(date)"
+    echo "Current Minute: $CURRENT_MINUTE"
+    echo "================================================"
+
+    # Check if running in the first minute of the hour
+    if [ "$CURRENT_MINUTE" = "00" ] || [ "$CURRENT_MINUTE" = "0" ]; then
+      echo ""
+      echo "ERROR: Database is under heavy load"
+      echo "The backup process cannot proceed at this time to avoid performance impact"
+      echo ""
+      echo "Recommended Actions:"
+      echo "  - Wait a few minutes and try again"
+      echo "  - Manually trigger backup at a different time"
+      echo "  - Check database metrics to confirm high load"
+      echo ""
+      echo "Backup Status: FAILED"
+      echo "Reason: Database loaded - retry later"
+      echo "Exit Code: 1"
+      echo "================================================"
+      exit 1
+    fi
+
+    echo ""
+    echo "Database load check: PASSED"
+    echo "Safe to proceed with backup at minute $CURRENT_MINUTE"
+    echo ""
+
+    # backup process
+    echo "Step 1/4: Connecting to ledger-db database"
+    echo "  Target: ledger-db:5432/postgresdb"
+    sleep 1
+    echo "  ✓ Connection established"
+
+    echo ""
+    echo "Step 2/4: Analyzing database tables"
+    echo "  Scanning TRANSACTIONS table..."
+    sleep 1
+    echo "  Scanning ACCOUNTS table..."
+    sleep 1
+    echo "  ✓ Database analysis complete"
+
+    echo ""
+    echo "Step 3/4: backup creation"
+    BACKUP_FILE="ledger-db-backup-$(date +%Y%m%d-%H%M%S).sql"
+    echo "  Backup file: /tmp/$BACKUP_FILE"
+    echo "  data export..."
+    sleep 2
+    echo "  ✓ Backup file created"
+
+    echo ""
+    echo "Step 4/4: Validating backup integrity"
+    sleep 1
+    echo "  ✓ Backup validation passed"
+
+    echo ""
+    echo "================================================"
+    echo "Backup Status: SUCCESS"
+    echo "Backup Location: /tmp/$BACKUP_FILE"
+    echo "Completion Time: $(date)"
+    echo "Duration: ~5 seconds"
+    echo "================================================"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  namespace: anthos-bank
+  labels:
+    application: bank-of-anthos
+    environment: development
+    team: ledger
+    tier: db
+  name: ledger-db-backup
+spec:
+  # Run every hour at the top of the hour (0th minute)
+  schedule: "0 * * * *"
+  # Number of successful finished jobs to retain
+  successfulJobsHistoryLimit: 3
+  # Number of failed finished jobs to retain
+  failedJobsHistoryLimit: 3
+  # Do not start a new job if the previous one is still running
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    metadata:
+      labels:
+        app: ledger-db-backup
+        application: bank-of-anthos
+        environment: development
+        team: ledger
+        tier: db
+    spec:
+      # Only one attempt - do not retry on failure
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app: ledger-db-backup
+            application: bank-of-anthos
+            environment: development
+            team: ledger
+            tier: db
+        spec:
+          restartPolicy: Never
+          serviceAccountName: default
+          volumes:
+            - name: backup-script
+              secret:
+                secretName: ledger-db-backup-script
+                defaultMode: 0755
+          containers:
+            - name: backup
+              # Use lightweight alpine image
+              image: alpine:3.19
+              command:
+                - /scripts/backup.sh
+              volumeMounts:
+                - name: backup-script
+                  mountPath: /scripts
+              resources:
+                limits:
+                  cpu: 100m
+                  memory: 64Mi
+                requests:
+                  cpu: 50m
+                  memory: 32Mi

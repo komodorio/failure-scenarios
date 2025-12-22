@@ -1,0 +1,149 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-department-label
+  annotations:
+    policies.kyverno.io/title: Require Department Label
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      All pods must have a 'department' label to track ownership
+      and cost allocation. This policy ensures compliance with organizational
+      labeling standards.
+    pod-policies.kyverno.io/autogen-controllers: none
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+    - name: check-for-department-label
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - NAMESPACE_PLACEHOLDER
+      validate:
+        message: "Pod must have a 'department' label (e.g., finance, engineering, operations)"
+        pattern:
+          metadata:
+            labels:
+              department: "?*"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: NAMESPACE_PLACEHOLDER
+  labels:
+    application: bank-of-anthos
+    environment: development
+    team: ledger
+    tier: backend
+  name: transaction-report
+spec:
+  type: ClusterIP
+  selector:
+    app: transaction-report
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: NAMESPACE_PLACEHOLDER
+  labels:
+    application: bank-of-anthos
+    environment: development
+    team: ledger
+    tier: backend
+    # Missing 'department' label - this will cause policy violation
+  name: transaction-report
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: transaction-report
+  template:
+    metadata:
+      labels:
+        app: transaction-report
+        application: bank-of-anthos
+        environment: development
+        team: ledger
+        tier: backend
+        # Missing 'department' label in pod template too
+    spec:
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 5
+      containers:
+        - name: transaction-report
+          image: alpine:3.19
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "=========================================="
+              echo "Transaction Report Service"
+              echo "=========================================="
+              echo ""
+              echo "Service: transaction-report"
+              echo "Port: 8080"
+              echo "Status: Running"
+              echo ""
+              echo "This service generates daily transaction reports"
+              echo "for the ledger team."
+              echo ""
+              echo "Simulating report generation..."
+              while true; do
+                echo "[$(date)] Generating transaction report..."
+                sleep 60
+              done
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: VERSION
+              value: "v0.1.0"
+            - name: PORT
+              value: "8080"
+          resources:
+            limits:
+              cpu: 100m
+              memory: 64Mi
+            requests:
+              cpu: 50m
+              memory: 32Mi
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - echo "ready"
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - echo "alive"
+            initialDelaySeconds: 10
+            periodSeconds: 15

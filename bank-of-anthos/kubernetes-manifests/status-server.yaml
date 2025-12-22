@@ -1,0 +1,361 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: anthos-bank
+  labels:
+    application: bank-of-anthos
+    environment: development
+    tier: monitoring
+  name: status-server
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  selector:
+    app: status-server
+    application: bank-of-anthos
+    environment: development
+    tier: monitoring
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: anthos-bank
+  labels:
+    application: bank-of-anthos
+    environment: development
+    tier: monitoring
+  name: status-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: status-server
+      application: bank-of-anthos
+      environment: development
+      tier: monitoring
+  template:
+    metadata:
+      labels:
+        app: status-server
+        application: bank-of-anthos
+        environment: development
+        tier: monitoring
+    spec:
+      containers:
+        - name: status-server
+          image: python:3.11-alpine
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: POSTGRES_HOST
+              value: "ledger-db"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: ledger-db-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: ledger-db-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  name: ledger-db-config
+                  key: POSTGRES_PASSWORD
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Install postgresql client
+              apk add --no-cache postgresql-client
+
+              cat > /app/server.py << 'EOF'
+              #!/usr/bin/env python3
+              from http.server import HTTPServer, BaseHTTPRequestHandler
+              import json
+              import os
+              import subprocess
+              import threading
+              import time
+              from datetime import datetime
+
+              STATUS_FILE = '/tmp/status.txt'
+              DB_LOCK_STATE_FILE = '/tmp/db_lock_state.txt'
+              DB_LOCK_CACHE_FILE = '/tmp/db_lock_cache.json'
+
+              # Initialize status file with 200 (healthy)
+              if not os.path.exists(STATUS_FILE):
+                  with open(STATUS_FILE, 'w') as f:
+                      f.write('200')
+
+              # Initialize database lock state tracking
+              if not os.path.exists(DB_LOCK_STATE_FILE):
+                  with open(DB_LOCK_STATE_FILE, 'w') as f:
+                      f.write('unknown')
+
+              # Initialize database lock cache
+              if not os.path.exists(DB_LOCK_CACHE_FILE):
+                  with open(DB_LOCK_CACHE_FILE, 'w') as f:
+                      json.dump({
+                          'locked': False,
+                          'message': 'Initializing...',
+                          'last_check': datetime.now().isoformat()
+                      }, f)
+
+              def check_database_lock():
+                  """Check if the database TRANSACTIONS table is locked"""
+                  try:
+                      # Get database connection details from environment
+                      db_host = os.environ.get('POSTGRES_HOST', 'ledger-db')
+                      db_port = os.environ.get('POSTGRES_PORT', '5432')
+                      db_name = os.environ.get('POSTGRES_DB', 'postgresdb')
+                      db_user = os.environ.get('POSTGRES_USER', 'admin')
+                      db_password = os.environ.get('POSTGRES_PASSWORD', 'password')
+
+                      # Try to query the TRANSACTIONS table with a short timeout
+                      env = os.environ.copy()
+                      env['PGPASSWORD'] = db_password
+
+                      result = subprocess.run(
+                          [
+                              'psql',
+                              '-h', db_host,
+                              '-p', db_port,
+                              '-U', db_user,
+                              '-d', db_name,
+                              '-c', 'SELECT COUNT(*) FROM TRANSACTIONS LIMIT 1;',
+                              '--set=statement_timeout=2000'  # 2 second timeout
+                          ],
+                          env=env,
+                          capture_output=True,
+                          timeout=3  # Python timeout of 3 seconds
+                      )
+
+                      # If the command succeeded, database is not locked
+                      if result.returncode == 0:
+                          return False, "Database accessible"
+                      else:
+                          return True, "Database query failed"
+
+                  except subprocess.TimeoutExpired:
+                      return True, "Database query timeout - likely locked"
+                  except Exception as e:
+                      return True, f"Database check error: {str(e)}"
+
+              def database_monitor():
+                  """Background thread to check database status every 30 seconds"""
+                  print('[Database Monitor] Started - checking every 30 seconds')
+
+                  while True:
+                      try:
+                          # Check database lock status
+                          db_locked, db_message = check_database_lock()
+
+                          # Read previous state
+                          with open(DB_LOCK_STATE_FILE, 'r') as f:
+                              previous_state = f.read().strip()
+
+                          current_state = 'locked' if db_locked else 'available'
+
+                          # Update cache
+                          cache_data = {
+                              'locked': db_locked,
+                              'message': db_message,
+                              'last_check': datetime.now().isoformat()
+                          }
+                          with open(DB_LOCK_CACHE_FILE, 'w') as f:
+                              json.dump(cache_data, f)
+
+                          # Log only on state change
+                          if previous_state != current_state:
+                              timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                              if db_locked:
+                                  print(f"[{timestamp}] DATABASE STATUS CHANGED: LOCKED - {db_message}")
+                              else:
+                                  print(f"[{timestamp}] DATABASE STATUS CHANGED: AVAILABLE - {db_message}")
+
+                              # Update state file
+                              with open(DB_LOCK_STATE_FILE, 'w') as f:
+                                  f.write(current_state)
+
+                      except Exception as e:
+                          print(f"[Database Monitor] Error: {e}")
+
+                      # Wait 30 seconds before next check
+                      time.sleep(30)
+
+              def get_cached_db_status():
+                  """Get the cached database status (fast - no DB query)"""
+                  try:
+                      with open(DB_LOCK_CACHE_FILE, 'r') as f:
+                          return json.load(f)
+                  except Exception as e:
+                      return {
+                          'locked': False,
+                          'message': f'Cache read error: {str(e)}',
+                          'last_check': datetime.now().isoformat()
+                      }
+
+              class StatusHandler(BaseHTTPRequestHandler):
+                  def log_message(self, format, *args):
+                      # Custom logging
+                      timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                      print(f"[{timestamp}] {format % args}")
+
+                  def do_GET(self):
+                      if self.path == '/status' or self.path == '/':
+                          # Get cached database status (instant - no DB query)
+                          cache = get_cached_db_status()
+                          db_locked = cache['locked']
+                          db_message = cache['message']
+                          last_check = cache['last_check']
+
+                          if db_locked:
+                              # Database is locked - return 503
+                              status_code = 503
+                              message = f"Service Unavailable - {db_message}"
+                          else:
+                              # Database is OK - check manual override
+                              with open(STATUS_FILE, 'r') as f:
+                                  status_code = int(f.read().strip())
+                              message = 'OK' if status_code == 200 else 'Error (manual override)'
+
+                          self.send_response(status_code)
+                          self.send_header('Content-Type', 'application/json')
+                          self.end_headers()
+
+                          response = {
+                              'status': status_code,
+                              'message': message,
+                              'database_locked': db_locked,
+                              'database_message': db_message,
+                              'last_db_check': last_check,
+                              'timestamp': datetime.now().isoformat()
+                          }
+                          self.wfile.write(json.dumps(response).encode())
+
+                      elif self.path == '/health':
+                          # Always return 200 for the server itself
+                          self.send_response(200)
+                          self.send_header('Content-Type', 'application/json')
+                          self.end_headers()
+                          response = {
+                              'status': 'healthy',
+                              'timestamp': datetime.now().isoformat()
+                          }
+                          self.wfile.write(json.dumps(response).encode())
+
+                      else:
+                          self.send_response(404)
+                          self.end_headers()
+                          self.wfile.write(b'Not Found')
+
+                  def do_POST(self):
+                      if self.path == '/set-status':
+                          # Set new status code
+                          content_length = int(self.headers.get('Content-Length', 0))
+                          body = self.rfile.read(content_length)
+
+                          try:
+                              data = json.loads(body)
+                              new_status = int(data.get('status', 200))
+
+                              # Validate status code
+                              if new_status not in [200, 500, 503]:
+                                  self.send_response(400)
+                                  self.end_headers()
+                                  self.wfile.write(b'Invalid status code. Use 200, 500, or 503.')
+                                  return
+
+                              # Save new status
+                              with open(STATUS_FILE, 'w') as f:
+                                  f.write(str(new_status))
+
+                              print(f"Status changed to: {new_status}")
+
+                              self.send_response(200)
+                              self.send_header('Content-Type', 'application/json')
+                              self.end_headers()
+
+                              response = {
+                                  'message': f'Status set to {new_status}',
+                                  'status': new_status,
+                                  'timestamp': datetime.now().isoformat()
+                              }
+                              self.wfile.write(json.dumps(response).encode())
+
+                          except Exception as e:
+                              self.send_response(400)
+                              self.end_headers()
+                              self.wfile.write(f'Error: {str(e)}'.encode())
+                      else:
+                          self.send_response(404)
+                          self.end_headers()
+
+              if __name__ == '__main__':
+                  # Start background database monitor thread
+                  monitor_thread = threading.Thread(target=database_monitor, daemon=True)
+                  monitor_thread.start()
+
+                  # Start HTTP server
+                  server = HTTPServer(('0.0.0.0', 8080), StatusHandler)
+                  print('Status Server with Database Lock Detection started on port 8080')
+                  print('Endpoints:')
+                  print('  GET  /status       - Get current status (cached, instant response)')
+                  print('  GET  /health       - Server health check (always returns 200)')
+                  print('  POST /set-status   - Set manual override (body: {"status": 200|500|503})')
+                  print('')
+                  print('Behavior:')
+                  print('  - Database checked every 30 seconds in background')
+                  print('  - Status requests return instantly from cache')
+                  print('  - Automatically returns 503 if TRANSACTIONS table is locked')
+                  print('  - Otherwise returns status from /tmp/status.txt (default: 200)')
+                  print('')
+                  print('Database:')
+                  print(f"  - Host: {os.environ.get('POSTGRES_HOST', 'ledger-db')}")
+                  print(f"  - Database: {os.environ.get('POSTGRES_DB', 'postgresdb')}")
+                  print(f"  - Check interval: 30 seconds")
+                  print('')
+                  server.serve_forever()
+              EOF
+
+              python3 -u /app/server.py
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: app
+              mountPath: /app
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: app
+          emptyDir: {}
