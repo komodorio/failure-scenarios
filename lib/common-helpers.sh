@@ -64,7 +64,7 @@ scenario_to_title_case() {
 
 # State management functions
 # State is stored in a ConfigMap in the default namespace
-STATE_CONFIGMAP_NAME="self-healing-state"
+STATE_CONFIGMAP_NAME="failure-scenarios-state"
 STATE_NAMESPACE="default"
 
 # Check if state exists

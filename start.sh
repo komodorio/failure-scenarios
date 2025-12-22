@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Bank of Anthos - Self-Healing Failure Injection System
+# Bank of Anthos - Failure Scenarios Injection System
 # Main entry point providing a unified interface for batch scenario operations
 
 set -euo pipefail
@@ -16,7 +16,7 @@ source "${SCRIPT_DIR}/lib/common-helpers.sh"
 display_menu() {
     echo ""
     echo "=========================================="
-    echo "  Self-Healing Scenario Management"
+    echo "  Failure Scenarios Scenario Management"
     echo "=========================================="
     echo ""
     echo "Setup & Deployment:"

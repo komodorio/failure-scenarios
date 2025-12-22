@@ -1,4 +1,4 @@
-# Bank of Anthos Self-Healing Failure Injection System
+# Bank of Anthos Failure Scenarios Failure Injection System
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.30+-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
@@ -11,8 +11,8 @@ Get up and running in under 5 minutes:
 
 ```bash
 # Clone the repository
-git clone https://github.com/komodorio/self-healing.git
-cd self-healing
+git clone git@github.com:komodorio/failure-scenarios.git
+cd failure-scenarios
 
 # Launch the interactive menu
 ./start.sh
@@ -248,7 +248,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## 📞 Support
 
-- **Issues:** [GitHub Issues](https://github.com/komodorio/self-healing/issues)
+- **Issues:** [GitHub Issues](https://github.com/komodorio/failure-scenarios/issues)
 - **Security:** security@komodor.io
 - **Documentation:** See [docs](#-documentation) section above
 

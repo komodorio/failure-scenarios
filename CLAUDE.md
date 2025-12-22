@@ -1,4 +1,4 @@
-# Bank of Anthos Self-Healing System
+# Bank of Anthos Failure Scenarios System
 
 This repository contains a comprehensive failure injection and testing system for Bank of Anthos on Kubernetes. It enables automated testing of various failure scenarios in isolated namespaces.
 
