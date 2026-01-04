@@ -159,18 +159,31 @@ kubectl get pods -n bad-deployment-scenario -w
 This system follows a modular, extensible architecture:
 
 ```
-├── batch/          # Batch operations for all scenarios
+├── batch/                    # Batch operations for all scenarios
 ├── scenarios/                # Individual failure injection scripts
 ├── lib/                      # Shared utilities and helpers
+├── config/                   # Configuration files
+│   └── namespace-mapping.conf  # Maps scenarios to custom namespaces
 └── bank-of-anthos/          # Google Cloud sample application
 ```
 
 ### Key Design Patterns
 
 1. **Dynamic Scenario Discovery** - Automatically discovers `*-scenario.sh` files
-2. **Namespace Override** - Same scripts work for user and dedicated namespaces
-3. **Parallel Execution** - Background processes with PID tracking
-4. **Shared Libraries** - DRY principle with centralized utilities
+2. **Custom Namespace Mapping** - Scenarios deploy to creative movie-themed namespaces
+3. **Namespace Override** - Same scripts work for user and dedicated namespaces
+4. **Parallel Execution** - Background processes with PID tracking
+5. **Shared Libraries** - DRY principle with centralized utilities
+
+### Namespace Naming
+
+Each scenario deploys to a custom namespace inspired by fictional cities from movies:
+- `bad-deployment` → `bank-of-springfield` (The Simpsons Movie)
+- `database-lock` → `bank-of-punxsutawney` (Groundhog Day)
+- `high-load` → `bank-of-seahaven` (The Truman Show)
+- And more! See [config/namespace-mapping.conf](config/namespace-mapping.conf) for the complete list.
+
+All namespaces include a timestamp suffix for isolation: `bank-of-springfield-{timestamp}`
 
 
 ### Adding a New Scenario
