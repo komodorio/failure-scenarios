@@ -45,7 +45,7 @@ print_scenario_description() {
     echo "  • CronJob: memory-intensive-cronjob (python:3.9-alpine container with 64Mi limit)"
     echo ""
     echo "Expected Behavior:"
-    echo "  • CronJob creates pods every minute"
+    echo "  • CronJob creates pods every 3 minutes"
     echo "  • Each pod prints messages about fetching from dependent services"
     echo "  • Each pod attempts to allocate ~150Mi of memory"
     echo "  • Container exceeds 64Mi limit and gets terminated by Kubernetes"
@@ -131,7 +131,7 @@ metadata:
     app: memory-intensive
     scenario: memory-intensive
 spec:
-  schedule: "*/1 * * * *"  # Every minute
+  schedule: "*/3 * * * *"  # Every 3 minutes
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
   jobTemplate:
@@ -175,7 +175,7 @@ EOF
     # Show the current status
     kubectl get cronjobs -n "${NAMESPACE}" -l scenario=memory-intensive
     echo ""
-    kubectl get jobs -n "${NAMESPACE}" -l app=memory-intensive 2>/dev/null || echo "No jobs created yet (will start within 1 minute)"
+    kubectl get jobs -n "${NAMESPACE}" -l app=memory-intensive 2>/dev/null || echo "No jobs created yet (will start within 3 minutes)"
     echo ""
     kubectl get pods -n "${NAMESPACE}" -l app=memory-intensive 2>/dev/null || echo "No pods created yet"
 }
@@ -245,7 +245,7 @@ action_inject() {
     echo "  • kubectl describe pod -n ${NAMESPACE} -l app=memory-intensive"
     echo "  • kubectl logs -n ${NAMESPACE} -l app=memory-intensive"
     echo ""
-    print_warning "CronJob will create a new pod every minute, each will be terminated within ~10 seconds due to memory limit"
+    print_warning "CronJob will create a new pod every 3 minutes, each will be terminated within ~10 seconds due to memory limit"
     echo ""
     print_info "To clean up this scenario, run: $0 revert"
     echo ""
