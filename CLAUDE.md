@@ -8,7 +8,9 @@ This repository contains a comprehensive failure injection and testing system fo
 
 1. **Multi-Namespace Deployment System**
    - Deploys Bank of Anthos to separate namespaces for each failure scenario
-   - Each scenario gets its own isolated namespace (e.g., `bad-deployment-scenario`, `database-lock-scenario`)
+   - Each scenario gets its own isolated namespace with creative movie-themed names (e.g., `bank-of-springfield`, `bank-of-punxsutawney`)
+   - Namespaces include timestamp suffix for batch isolation (e.g., `bank-of-springfield-20260102-100000`)
+   - Custom namespace mapping via [config/namespace-mapping.conf](config/namespace-mapping.conf)
    - Original user-namespace workflow remains unchanged for backward compatibility
 
 2. **Failure Scenarios** ([scenarios/](scenarios/))
@@ -22,13 +24,20 @@ This repository contains a comprehensive failure injection and testing system fo
    - Color-coded output functions for consistent UX
    - `discover_scenarios()` - Dynamic scenario discovery from filesystem
    - `scenario_to_title_case()` - Display name conversion
+   - `get_namespace_base()` - Namespace mapping lookup (bash 3.x compatible)
+   - State management functions for timestamp coordination
 
-4. **Management Scripts**
-   - [setup-all-scenarios.sh](setup-all-scenarios.sh) - Deploy to all scenario namespaces (~3 min)
-   - [inject-all-scenarios.sh](inject-all-scenarios.sh) - Inject all failures in parallel (~1-2 min)
-   - [inject-failure-by-namespace.sh](inject-failure-by-namespace.sh) - Interactive single injection
-   - [check-all-scenarios.sh](check-all-scenarios.sh) - Status checking utility
-   - [cleanup-all-scenarios.sh](cleanup-all-scenarios.sh) - Namespace cleanup
+4. **Configuration** ([config/](config/))
+   - [namespace-mapping.conf](config/namespace-mapping.conf) - Maps scenarios to custom namespace names
+   - Simple key=value format, bash 3.x compatible
+   - Fictional movie cities theme for easy identification
+
+5. **Management Scripts** ([batch/](batch/))
+   - [setup-all-scenarios.sh](batch/setup-all-scenarios.sh) - Deploy to all scenario namespaces (~3 min)
+   - [inject-all-scenarios.sh](batch/inject-all-scenarios.sh) - Inject all failures in parallel (~1-2 min)
+   - [inject-failure-by-namespace.sh](batch/inject-failure-by-namespace.sh) - Interactive single injection
+   - [check-all-scenarios.sh](batch/check-all-scenarios.sh) - Status checking utility
+   - [cleanup-all-scenarios.sh](batch/cleanup-all-scenarios.sh) - Namespace cleanup
 
 ## Common Commands
 
@@ -114,7 +123,53 @@ discover_scenarios() {
 }
 ```
 
-### 2. Namespace Override Pattern
+### 2. Custom Namespace Mapping (Bash 3.x Compatible)
+**Why**: Creative, meaningful namespace names improve identification and user experience. However, macOS uses bash 3.2 which doesn't support associative arrays.
+
+**How**: Simple grep-based lookup from config file instead of associative arrays.
+
+**Location**: [lib/common-helpers.sh:65-92](lib/common-helpers.sh#L65-L92)
+
+```bash
+get_namespace_base() {
+    local scenario="$1"
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local config_file="${script_dir}/../config/namespace-mapping.conf"
+
+    # If config file doesn't exist, use default
+    if [ ! -f "$config_file" ]; then
+        echo "${scenario}-scenario"
+        return
+    fi
+
+    # Look up the scenario in the config file
+    local mapped_namespace
+    mapped_namespace=$(grep "^${scenario}=" "$config_file" 2>/dev/null | cut -d'=' -f2 | xargs)
+
+    # Return mapped namespace or default
+    if [ -n "$mapped_namespace" ]; then
+        echo "$mapped_namespace"
+    else
+        echo "${scenario}-scenario"
+    fi
+}
+```
+
+**Configuration**: [config/namespace-mapping.conf](config/namespace-mapping.conf)
+```bash
+bad-deployment=bank-of-springfield
+database-lock=bank-of-punxsutawney
+high-load=bank-of-seahaven
+# Add more mappings...
+```
+
+**Result**:
+- `bad-deployment` → `bank-of-springfield-{timestamp}`
+- `database-lock` → `bank-of-punxsutawney-{timestamp}`
+- Unmapped scenarios use default: `{scenario}-scenario-{timestamp}`
+
+### 3. Namespace Override Pattern
 **Why**: Scenarios should work in both user namespaces and dedicated scenario namespaces without code duplication.
 
 **How**: Use bash parameter expansion with default values in [scenarios/common.sh:6](scenarios/common.sh#L6).
@@ -129,10 +184,10 @@ NAMESPACE="${NAMESPACE:-anthos-bank-${USER}}"
 ./scenarios/bad-deployment-scenario.sh
 
 # Override to use dedicated namespace
-NAMESPACE="bad-deployment-scenario" ./scenarios/bad-deployment-scenario.sh
+NAMESPACE="bank-of-springfield-20260102-100000" ./scenarios/bad-deployment-scenario.sh
 ```
 
-### 3. Parallel Execution
+### 4. Parallel Execution
 **Why**: Deploying 10+ namespaces sequentially takes too long. Running in parallel reduces time from 30+ minutes to ~3 minutes.
 
 **How**: Background processes with PID tracking and exit status files.
@@ -164,7 +219,7 @@ for i in "${!pids[@]}"; do
 done
 ```
 
-### 4. Shared Library Pattern
+### 5. Shared Library Pattern
 **Why**: DRY principle - eliminate ~150 lines of duplicated code across scripts.
 
 **How**: Extract common functions to [lib/common-helpers.sh](lib/common-helpers.sh) and source from all scripts.
@@ -178,9 +233,10 @@ source "${SCRIPT_DIR}/lib/common-helpers.sh"
 # Now use shared functions
 print_success "Deployment complete!"
 SCENARIOS=($(discover_scenarios "$SCRIPT_DIR"))
+namespace_base=$(get_namespace_base "bad-deployment")  # Returns "bank-of-springfield"
 ```
 
-### 5. Fast Deployment Without Waiting
+### 6. Fast Deployment Without Waiting
 **Why**: Speed. Waiting for all pods to be ready in 10+ namespaces is unnecessary for initial deployment.
 
 **How**: Remove waiting loops from deployment. Pods start in background. Provide separate status checking script.
@@ -285,8 +341,17 @@ print_error "Error message"              # Red
 │   ├── kubernetes-manifests/          # K8s manifests
 │   └── extras/jwt/                     # JWT secrets
 │
+├── config/
+│   └── namespace-mapping.conf         # Scenario → namespace mappings
+│
 ├── lib/
 │   └── common-helpers.sh              # Shared utilities
+│
+├── batch/                              # Multi-namespace batch operations
+│   ├── setup-all-scenarios.sh
+│   ├── inject-all-scenarios.sh
+│   ├── check-all-scenarios.sh
+│   └── cleanup-all-scenarios.sh
 │
 ├── scenarios/
 │   ├── common.sh                      # Scenario-specific shared code
@@ -313,11 +378,12 @@ print_error "Error message"              # Red
 
 ## Important Files Reference
 
-- **[lib/common-helpers.sh](lib/common-helpers.sh)** - Core shared utilities
+- **[lib/common-helpers.sh](lib/common-helpers.sh)** - Core shared utilities (includes `get_namespace_base()`)
+- **[config/namespace-mapping.conf](config/namespace-mapping.conf)** - Scenario to namespace mappings
 - **[scenarios/common.sh](scenarios/common.sh)** - Scenario-specific shared code
 - **[MULTI_NAMESPACE_SETUP.md](MULTI_NAMESPACE_SETUP.md)** - Detailed multi-namespace guide
-- **[setup-all-scenarios.sh](setup-all-scenarios.sh)** - Main deployment script
-- **[inject-all-scenarios.sh](inject-all-scenarios.sh)** - Parallel failure injection
+- **[batch/setup-all-scenarios.sh](batch/setup-all-scenarios.sh)** - Main deployment script
+- **[batch/inject-all-scenarios.sh](batch/inject-all-scenarios.sh)** - Parallel failure injection
 
 ## Tips for Future Development
 
@@ -328,6 +394,8 @@ print_error "Error message"              # Red
 5. **Document in MULTI_NAMESPACE_SETUP.md**: Keep usage examples up to date
 6. **Use shared functions**: Don't duplicate color output or discovery logic
 7. **Test parallel execution**: Ensure scenarios don't interfere with each other
+8. **Bash 3.x compatibility**: Test on macOS (`/bin/bash`) - no associative arrays, avoid bash 4+ features
+9. **Update namespace mapping**: Add new scenarios to [config/namespace-mapping.conf](config/namespace-mapping.conf) with creative names
 
 ## Common Troubleshooting
 

@@ -19,6 +19,7 @@ SCENARIOS=($(discover_scenarios "${SCRIPT_DIR}/.."))
 # Function to deploy Bank of Anthos to a specific namespace
 deploy_to_namespace() {
     local namespace=$1
+    local scenario=$2
 
     print_info "=========================================="
     print_info "Deploying to namespace: ${namespace}"
@@ -65,8 +66,8 @@ deploy_to_namespace() {
     print_success "Kubernetes manifests applied successfully"
     echo ""
 
-    # Deploy Redis using Helm only for helm-bad-upgrade-scenario
-    if [[ "$namespace" == helm-bad-upgrade-scenario* ]]; then
+    # Deploy Redis using Helm only for helm-bad-upgrade scenario
+    if [[ "$scenario" == "helm-bad-upgrade" ]]; then
         print_info "Deploying Redis (cash-cache) using Helm..."
         helm upgrade --install cash-cache ./helm/redis -n "$namespace" --reset-values 2>/dev/null || true
         print_success "Redis (cash-cache) deployed successfully"
@@ -225,7 +226,7 @@ main() {
 
         # Run deployment in background
         (
-            deploy_to_namespace "$namespace" > "/tmp/${namespace}-deployment.log" 2>&1
+            deploy_to_namespace "$namespace" "$scenario" > "/tmp/${namespace}-deployment.log" 2>&1
             echo $? > "/tmp/${namespace}-deployment.status"
             # Call scenario's auto-apply action (scenarios that override it will apply, others do nothing)
             local scenario_script="${SCRIPT_DIR}/../scenarios/${scenario}-scenario.sh"
