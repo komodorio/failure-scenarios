@@ -20,6 +20,7 @@ This document provides a summary of all available failure scenarios, their affec
 | **oom-killed**            | bank-of-radiator-springs | `transactionhistory` fails to start after a deploy with a much lower limits           | ✅ Yes       | Rollback to original memory limits               |
 | **resource-quota**        | bank-of-whoville         | `userservice` fails scaling to 5 replicas causing                                     | ❌ No        | Manual ResourceQuota removal required            |
 | **wrong-sa**              | bank-of-hogsmeade        | `riskassessment` fails to start due to a typo in service account name                 | ❌ No        | Manual ServiceAccount fix required               |
+| **oomkill-cronjob**       | bank-of-bedrock          | `memory-intensive-cronjob` (CronJob) fails every 3 minutes due to allocating more memory than limit | ✅ Yes       | Manual CronJob deletion or limit increase required |
 
 ---
 

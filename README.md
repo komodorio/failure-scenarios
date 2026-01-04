@@ -77,22 +77,8 @@ jq --version
 
 ## 📖 Available Failure Scenarios
 
-| Scenario | Description | Impact |
-|----------|-------------|--------|
-| **bad-deployment** | Broken pod configuration with non-existent image | Deployment failures, ImagePullBackOff |
-| **config-misconfigured** | Invalid configuration causing runtime errors | Application crashes, service unavailability |
-| **database-lock** | Database locking/deadlock conditions | Transaction failures, cascading issues |
-| **failed-backup-cronjob** | CronJob that fails at specific times (minute 00) | Failed backup jobs, time-based failures |
-| **helm-bad-upgrade** | Failed Helm upgrade scenarios | Rollback required, version conflicts |
-| **high-load** | CPU/memory stress testing | Performance degradation, throttling |
-| **kyverno-policy** | Policy enforcement blocking pod creation | Admission control failures, compliance violations |
-| **limit-range-contacts** | Resource limit violations in namespace | Pod rejection, quota errors |
-| **missing-storage-class** | StatefulSet with non-existent StorageClass | PVC provisioning failures, pending pods |
-| **network-policy** | Network policy blocking communication | Service connectivity failures |
-| **node-selector** | Pod scheduling failures due to node constraints | Unschedulable pods, pending state |
-| **oom-killed** | Out-of-memory scenarios | Container OOMKilled, data loss |
-| **resource-quota** | Namespace resource quota violations | Resource exhaustion, deployment blocked |
-| **wrong-sa** | Deployment with mismatched ServiceAccount | Pod startup failures, RBAC errors |
+For a full summary of all available failure scenarios, see the [Scenarios Overview Table](./SCENARIOS.md).
+
 
 ## 🎮 Usage
 
