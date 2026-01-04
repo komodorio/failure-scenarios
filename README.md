@@ -77,7 +77,7 @@ jq --version
 
 ## 📖 Available Failure Scenarios
 
-For a full summary of all available failure scenarios, see the [Scenarios Overview Table](./SCENARIOS.md).
+For a full summary of all available failure scenarios, see the [Scenarios Overview Table](./scenarios/SCENARIOS.md).
 
 
 ## 🎮 Usage
