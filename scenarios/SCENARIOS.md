@@ -21,6 +21,9 @@ This document provides a summary of all available failure scenarios, their affec
 | **resource-quota**        | bank-of-whoville         | `userservice` fails scaling to 5 replicas causing                                     | ❌ No        | Manual ResourceQuota removal required            |
 | **wrong-sa**              | bank-of-hogsmeade        | `riskassessment` fails to start due to a typo in service account name                 | ❌ No        | Manual ServiceAccount fix required               |
 | **oomkill-cronjob**       | bank-of-bedrock          | `memory-intensive-cronjob` (CronJob) fails every 3 minutes due to allocating more memory than limit | ✅ Yes       | Manual CronJob deletion or limit increase required |
+| **cascade-failure-missing-configmap** | bank-of-zion | `web-frontend`, `api-backend`, `data-processor` fail to start due to missing ConfigMap reference | ❌ No | Restore correct ConfigMap reference or create missing ConfigMap |
+| **cascade-relay-on-other-service** | bank-of-los-angeles-2019 | `message-server` breaks causing `message-client` cascading failures | ❌ No | Restore MESSAGE environment variable in server |
+| **availability-issue-bad-secret-change** | bank-of-the-grid | `python-worker` fails after secret updated with invalid APP_MODE value | ❌ No | Revert secret to valid configuration |
 
 ---
 
