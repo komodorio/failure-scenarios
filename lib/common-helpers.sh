@@ -62,6 +62,35 @@ scenario_to_title_case() {
     echo "$scenario_name" | sed 's/-/ /g' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2));}1'
 }
 
+# Get the base namespace for a scenario (mapped or default)
+# This function looks up the scenario in the mapping config file
+# Usage: namespace_base=$(get_namespace_base "bad-deployment")
+# Returns: "bank-of-springfield" (if mapped) or "bad-deployment-scenario" (if not)
+get_namespace_base() {
+    local scenario="$1"
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local config_file="${script_dir}/../config/namespace-mapping.conf"
+
+    # If config file doesn't exist, use default
+    if [ ! -f "$config_file" ]; then
+        echo "${scenario}-scenario"
+        return
+    fi
+
+    # Look up the scenario in the config file
+    # Format: scenario-name=namespace-base
+    local mapped_namespace
+    mapped_namespace=$(grep "^${scenario}=" "$config_file" 2>/dev/null | cut -d'=' -f2 | xargs)
+
+    # Return mapped namespace or default
+    if [ -n "$mapped_namespace" ]; then
+        echo "$mapped_namespace"
+    else
+        echo "${scenario}-scenario"
+    fi
+}
+
 # State management functions
 # State is stored in a ConfigMap in the default namespace
 STATE_CONFIGMAP_NAME="failure-scenarios-state"
@@ -108,20 +137,22 @@ remove_state() {
 # Get namespace name with timestamp for a scenario
 # Requires state to exist (state must be created via setup-all-scenarios.sh)
 # Usage: namespace=$(get_namespace_with_timestamp "bad-deployment")
-# Returns: "bad-deployment-scenario-20240101-120000"
+# Returns: "bank-of-springfield-20240101-120000" (if mapped) or "bad-deployment-scenario-20240101-120000" (if not)
 get_namespace_with_timestamp() {
     local scenario="$1"
     local timestamp
-    local namespace="${scenario}-scenario"
-    
+    local namespace_base
+
+    # Get base namespace (uses mapping if available)
+    namespace_base=$(get_namespace_base "$scenario")
+
     timestamp=$(get_state_timestamp)
     if [ -z "$timestamp" ]; then
         echo "ERROR: No state timestamp found" >&2
         return 1
     fi
-    
-    namespace="${namespace}-${timestamp}"
-    echo "$namespace"
+
+    echo "${namespace_base}-${timestamp}"
 }
 
 # Get all namespaces for current state
@@ -131,6 +162,7 @@ get_all_state_namespaces() {
     local scenarios=()
     local timestamp
     local namespaces=()
+    local namespace_base
 
     timestamp=$(get_state_timestamp)
     if [ -z "$timestamp" ]; then
@@ -141,7 +173,8 @@ get_all_state_namespaces() {
     scenarios=($(discover_scenarios "$project_root"))
 
     for scenario in "${scenarios[@]}"; do
-        namespaces+=("${scenario}-scenario-${timestamp}")
+        namespace_base=$(get_namespace_base "$scenario")
+        namespaces+=("${namespace_base}-${timestamp}")
     done
 
     echo "${namespaces[@]}"
