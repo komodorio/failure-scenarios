@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Increase Memory Scenario
-# This script deploys a standalone Job that immediately triggers an OOMKill condition
+# Memory Intensive CronJob Scenario
+# This script deploys a CronJob that repeatedly triggers memory limit exceeded condition
 #
 # Usage:
 #   ./increase-memory-scenario.sh          # Deploy and trigger failure (default)
@@ -21,8 +21,8 @@ source "${SCRIPT_DIR}/common.sh"
 # SCENARIO METADATA
 # ==============================================================================
 
-SCENARIO_NAME="Increase Memory (OOMKill)"
-SCENARIO_DESCRIPTION="Deploys a Job that allocates more memory than its limit, triggering OOMKill"
+SCENARIO_NAME="Memory Intensive CronJob"
+SCENARIO_DESCRIPTION="Deploys a CronJob that repeatedly allocates more memory than its limit, triggering container termination every minute"
 
 # ==============================================================================
 # SHARED FUNCTIONS
@@ -36,26 +36,26 @@ print_scenario_description() {
     echo "=========================================="
     echo ""
     echo "Description:"
-    echo "  This scenario deploys a standalone Job (not part of Bank of Anthos) that"
+    echo "  This scenario deploys a standalone CronJob (not part of Bank of Anthos) that"
     echo "  simulates a service fetching data from dependencies, then allocates more"
-    echo "  memory than its configured limit, causing Kubernetes to OOMKill the container."
+    echo "  memory than its configured limit, causing Kubernetes to terminate the container."
     echo ""
     echo "Resources Deployed:"
     echo "  • Secret: memory-test-script (contains the bash script)"
-    echo "  • CronJob: increase-memory-cronjob (python:3.9-alpine container with 64Mi limit)"
+    echo "  • CronJob: memory-intensive-cronjob (python:3.9-alpine container with 64Mi limit)"
     echo ""
     echo "Expected Behavior:"
     echo "  • CronJob creates pods every minute"
     echo "  • Each pod prints messages about fetching from dependent services"
     echo "  • Each pod attempts to allocate ~150Mi of memory"
-    echo "  • Container exceeds 64Mi limit and gets OOMKilled by Kubernetes"
-    echo "  • Repeated OOMKilled pods demonstrate continuous failure pattern"
+    echo "  • Container exceeds 64Mi limit and gets terminated by Kubernetes"
+    echo "  • Repeated failures demonstrate continuous failure pattern"
     echo ""
     echo "Observable Symptoms:"
-    echo "  • Pod status shows 'OOMKilled' reason"
+    echo "  • Pod status shows 'Error' with reason related to memory"
     echo "  • Job shows 0/1 completions with failures"
-    echo "  • Container exit code 137 (128 + 9, where 9 is SIGKILL)"
-    echo "  • Memory metrics hitting the 64Mi ceiling before termination"
+    echo "  • Container exit code 137 (killed by system)"
+    echo "  • Memory usage hitting the 64Mi ceiling before termination"
     echo ""
     echo "=========================================="
     echo ""
@@ -109,7 +109,7 @@ stringData:
   allocate.py: |
     import time
     print("[allocator] Allocating memory array...", flush=True)
-    # Allocate a large bytearray to consume memory - 150MB to guarantee OOMKill with 64Mi limit
+    # Allocate a large bytearray to consume memory - 150MB to exceed the 64Mi limit
     data = bytearray(150 * 1024 * 1024)  # 150MB
     print("[allocator] Memory allocated successfully - 150MB", flush=True)
     print("[allocator] Service ready to process requests...", flush=True)
@@ -119,17 +119,17 @@ EOF
 
     print_success "Secret created successfully"
 
-    # Create the CronJob that will trigger OOMKill
+    # Create the CronJob that will trigger memory limit exceeded
     print_info "Creating CronJob with memory limit (64Mi) lower than allocation (150Mi)..."
     
     cat <<EOF | kubectl apply -n "${NAMESPACE}" -f -
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: increase-memory-cronjob
+  name: memory-intensive-cronjob
   labels:
-    app: memory-test
-    scenario: increase-memory
+    app: memory-intensive
+    scenario: memory-intensive
 spec:
   schedule: "*/1 * * * *"  # Every minute
   successfulJobsHistoryLimit: 3
@@ -140,7 +140,7 @@ spec:
       template:
         metadata:
           labels:
-            app: memory-test
+            app: memory-intensive
         spec:
           restartPolicy: Never
           containers:
@@ -173,11 +173,11 @@ EOF
     sleep 5
     
     # Show the current status
-    kubectl get cronjobs -n "${NAMESPACE}" -l scenario=increase-memory
+    kubectl get cronjobs -n "${NAMESPACE}" -l scenario=memory-intensive
     echo ""
-    kubectl get jobs -n "${NAMESPACE}" -l app=memory-test 2>/dev/null || echo "No jobs created yet (will start within 1 minute)"
+    kubectl get jobs -n "${NAMESPACE}" -l app=memory-intensive 2>/dev/null || echo "No jobs created yet (will start within 1 minute)"
     echo ""
-    kubectl get pods -n "${NAMESPACE}" -l app=memory-test 2>/dev/null || echo "No pods created yet"
+    kubectl get pods -n "${NAMESPACE}" -l app=memory-intensive 2>/dev/null || echo "No pods created yet"
 }
 
 # ==============================================================================
@@ -188,9 +188,9 @@ revert_failure() {
     print_info "Cleaning up memory test resources from namespace: ${NAMESPACE}..."
 
     # Delete the CronJob (will stop creating new jobs)
-    if kubectl get cronjob increase-memory-cronjob -n "${NAMESPACE}" >/dev/null 2>&1; then
-        print_info "Deleting CronJob: increase-memory-cronjob"
-        kubectl delete cronjob increase-memory-cronjob -n "${NAMESPACE}"
+    if kubectl get cronjob memory-intensive-cronjob -n "${NAMESPACE}" >/dev/null 2>&1; then
+        print_info "Deleting CronJob: memory-intensive-cronjob"
+        kubectl delete cronjob memory-intensive-cronjob -n "${NAMESPACE}"
         print_success "CronJob deleted"
     else
         print_info "CronJob not found, skipping"
@@ -198,7 +198,7 @@ revert_failure() {
 
     # Delete all Jobs created by the CronJob
     print_info "Deleting Jobs created by CronJob..."
-    kubectl delete jobs -n "${NAMESPACE}" -l app=memory-test 2>/dev/null || true
+    kubectl delete jobs -n "${NAMESPACE}" -l app=memory-intensive 2>/dev/null || true
     print_success "Jobs deleted"
 
     # Delete the Secret
@@ -238,14 +238,14 @@ action_inject() {
     echo ""
     print_success "${SCENARIO_NAME} scenario deployed successfully!"
     echo ""
-    print_info "To monitor the OOMKill:"
-    echo "  • kubectl get cronjobs -n ${NAMESPACE} -l scenario=increase-memory"
-    echo "  • kubectl get jobs -n ${NAMESPACE} -l app=memory-test"
-    echo "  • kubectl get pods -n ${NAMESPACE} -l app=memory-test -w"
-    echo "  • kubectl describe pod -n ${NAMESPACE} -l app=memory-test"
-    echo "  • kubectl logs -n ${NAMESPACE} -l app=memory-test"
+    print_info "To monitor the memory limit failures:"
+    echo "  • kubectl get cronjobs -n ${NAMESPACE} -l scenario=memory-intensive"
+    echo "  • kubectl get jobs -n ${NAMESPACE} -l app=memory-intensive"
+    echo "  • kubectl get pods -n ${NAMESPACE} -l app=memory-intensive -w"
+    echo "  • kubectl describe pod -n ${NAMESPACE} -l app=memory-intensive"
+    echo "  • kubectl logs -n ${NAMESPACE} -l app=memory-intensive"
     echo ""
-    print_warning "CronJob will create a new pod every minute, each will be OOMKilled within ~10 seconds"
+    print_warning "CronJob will create a new pod every minute, each will be terminated within ~10 seconds due to memory limit"
     echo ""
     print_info "To clean up this scenario, run: $0 revert"
     echo ""
