@@ -1,0 +1,148 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: anthos-bank
+  name: message-server
+  labels:
+    scenario: cascade-relay-on-other-service
+    application: messaging
+    tier: backend
+    role: server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: message-server
+      scenario: cascade-relay-on-other-service
+  template:
+    metadata:
+      labels:
+        app: message-server
+        scenario: cascade-relay-on-other-service
+        tier: backend
+        role: server
+    spec:
+      containers:
+      - name: server
+        image: python:3.10-slim
+        ports:
+        - containerPort: 8080
+        env:
+        - name: PORT
+          value: "8080"
+        - name: MESSAGE
+          value: "Hello from server"
+        command: ["python", "-u", "-c"]
+        args:
+        - |
+          import os
+          import http.server
+          import socketserver
+          
+          PORT = int(os.getenv("PORT", "8080"))
+          MESSAGE = os.getenv("MESSAGE", "")
+          
+          class Handler(http.server.SimpleHTTPRequestHandler):
+              def do_GET(self):
+                  self.send_response(200)
+                  self.send_header("Content-type", "text/plain")
+                  self.end_headers()
+                  self.wfile.write(MESSAGE.encode())
+          
+          print(f"Server starting on port {PORT}")
+          print(f"MESSAGE value: '{MESSAGE}'")
+          
+          with socketserver.TCPServer(("", PORT), Handler) as httpd:
+              print(f"Serving on port {PORT}")
+              httpd.serve_forever()
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: anthos-bank
+  name: message-server
+  labels:
+    scenario: cascade-relay-on-other-service
+    application: messaging
+spec:
+  selector:
+    app: message-server
+    scenario: cascade-relay-on-other-service
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: anthos-bank
+  name: message-client
+  labels:
+    scenario: cascade-relay-on-other-service
+    application: messaging
+    tier: frontend
+    role: client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: message-client
+      scenario: cascade-relay-on-other-service
+  template:
+    metadata:
+      labels:
+        app: message-client
+        scenario: cascade-relay-on-other-service
+        tier: frontend
+        role: client
+    spec:
+      containers:
+      - name: client
+        image: python:3.10-slim
+        env:
+        - name: SERVER_URL
+          value: "http://message-server:8080"
+        command: ["python", "-u", "-c"]
+        args:
+        - |
+          import os
+          import time
+          import urllib.request
+          import urllib.error
+          
+          SERVER_URL = os.getenv("SERVER_URL", "http://message-server:8080")
+          
+          print(f"Client starting, will connect to {SERVER_URL}")
+          
+          while True:
+              try:
+                  print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Requesting message from server...")
+                  with urllib.request.urlopen(SERVER_URL, timeout=5) as response:
+                      message = response.read().decode()
+                      if not message:
+                          print(f"ERROR: Received empty message from server!")
+                      else:
+                          print(f"SUCCESS: Received message: '{message}'")
+              except urllib.error.URLError as e:
+                  print(f"ERROR: Failed to connect to server: {e}")
+              except Exception as e:
+                  print(f"ERROR: Unexpected error: {e}")
+              
+              time.sleep(10)
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+
