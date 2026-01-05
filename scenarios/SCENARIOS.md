@@ -14,12 +14,9 @@ This document provides a summary of all available failure scenarios, their affec
 | **helm-bad-upgrade**      | bank-of-bedford-falls    | `cash-cache` redis fails to start due to a bad configuration typo                     | ✅ Yes       | Helm rollback                                    |
 | **kyverno-policy**        | bank-of-koriko           | `transaction-report` fails to start due to a kyverno policy                           | ❌ No        | Manual policy removal or pod annotation required |
 | **limit-range-contacts**  | bank-of-sandford         | `contacts` fails to start due to a newly introduced limit range                       | ❌ No        | Manual LimitRange removal required               |
-| **missing-storage-class** | bank-of-mos-eisley       | `transactions-audit-log` fails to start due to a non existent storage class           | ❌ No        | Manual StorageClass creation or PVC fix required |
 | **network-policy**        | bank-of-twin-peaks       | `userservice` fails. to connect to `accounts-db` due to a NetworkPolicy               | ❌ No        | Manual NetworkPolicy removal required            |
 | **node-selector**         | bank-of-pleasantville    | `balancereader` fails a deploy after adding a non-existent node-selector              | ✅ Yes       | Rollback (remove nodeSelector)                   |
 | **oom-killed**            | bank-of-radiator-springs | `transactionhistory` fails to start after a deploy with a much lower limits           | ✅ Yes       | Rollback to original memory limits               |
-| **resource-quota**        | bank-of-whoville         | `userservice` fails scaling to 5 replicas causing                                     | ❌ No        | Manual ResourceQuota removal required            |
-| **wrong-sa**              | bank-of-hogsmeade        | `riskassessment` fails to start due to a typo in service account name                 | ❌ No        | Manual ServiceAccount fix required               |
 | **oomkill-cronjob**       | bank-of-bedrock          | `memory-intensive-cronjob` (CronJob) fails every 3 minutes due to allocating more memory than limit | ✅ Yes       | Manual CronJob deletion or limit increase required |
 
 ---

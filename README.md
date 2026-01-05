@@ -36,8 +36,8 @@ Or run individual commands:
 
 ## ✨ Features
 
-- 🎯 **14 Failure Scenarios** - Database locks, OOM kills, policy violations, CronJob failures, and more
-- ⚡ **Parallel Execution** - Deploy 14 namespaces in parallel (~3 minutes)
+- 🎯 **11 Failure Scenarios** - Database locks, OOM kills, policy violations, CronJob failures, and more
+- ⚡ **Parallel Execution** - Deploy 11 namespaces in parallel (~3 minutes)
 - 🔒 **Isolated Testing** - Each scenario runs in its own namespace
 - 🔄 **Dynamic Discovery** - Add new scenarios with zero code changes
 - 📊 **Multiple Interfaces** - Interactive menus, individual commands, or batch operations

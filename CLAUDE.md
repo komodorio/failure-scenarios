@@ -86,13 +86,15 @@ NAMESPACE="bad-deployment-scenario" ./scenarios/restore.sh
 - **bad-deployment** - Broken pod configuration causing deployment failures
 - **config-misconfigured** - Invalid configuration leading to runtime errors
 - **database-lock** - Database locking/deadlock conditions
+- **failed-backup-cronjob** - CronJob failures due to timing conflicts
 - **helm-bad-upgrade** - Failed Helm upgrade scenarios
 - **high-load** - CPU/memory stress testing
+- **kyverno-policy** - Policy enforcement blocking pod creation
 - **limit-range-contacts** - Resource limit violations
 - **network-policy** - Network connectivity failures
 - **node-selector** - Pod scheduling failures
 - **oom-killed** - Out-of-memory scenarios
-- **resource-quota** - Namespace quota violations
+- **oomkill-cronjob** - CronJob OOM scenarios
 
 ## Key Architectural Decisions
 

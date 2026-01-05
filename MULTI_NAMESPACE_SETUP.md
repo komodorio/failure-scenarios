@@ -27,11 +27,9 @@ Each scenario is deployed to a custom namespace inspired by fictional cities fro
 | network-policy | bank-of-twin-peaks | Twin Peaks | bank-of-twin-peaks-{timestamp} |
 | node-selector | bank-of-pleasantville | Pleasantville | bank-of-pleasantville-{timestamp} |
 | oom-killed | bank-of-radiator-springs | Cars | bank-of-radiator-springs-{timestamp} |
-| resource-quota | bank-of-whoville | The Grinch | bank-of-whoville-{timestamp} |
 | failed-backup-cronjob | bank-of-arendelle | Frozen | bank-of-arendelle-{timestamp} |
 | kyverno-policy | bank-of-koriko | Kiki's Delivery Service | bank-of-koriko-{timestamp} |
-| missing-storage-class | bank-of-mos-eisley | Star Wars | bank-of-mos-eisley-{timestamp} |
-| wrong-sa | bank-of-hogsmeade | Harry Potter | bank-of-hogsmeade-{timestamp} |
+| oomkill-cronjob | bank-of-bedrock | The Flintstones | bank-of-bedrock-{timestamp} |
 
 The timestamp suffix ensures isolation between different deployment batches.
 
@@ -78,7 +76,7 @@ Deploys Bank of Anthos to separate namespaces for each scenario.
 - `bank-of-punxsutawney-{timestamp}` (database-lock)
 - `bank-of-seahaven-{timestamp}` (high-load)
 - `bank-of-radiator-springs-{timestamp}` (oom-killed)
-- `bank-of-whoville-{timestamp}` (resource-quota)
+- `bank-of-bedrock-{timestamp}` (oomkill-cronjob)
 - And more! See the [Namespace Naming](#namespace-naming) section above.
 
 ### 2. `batch/check-all-scenarios.sh`
@@ -103,8 +101,8 @@ Checks the status of all scenario namespaces.
 ✓ bank-of-bedford-falls-20260102-100000 - All pods ready
 
 Summary:
-Total scenario namespaces: 14
-Ready: 12
+Total scenario namespaces: 11
+Ready: 9
 Not ready: 2
 ```
 
@@ -128,13 +126,13 @@ Injects all failure scenarios to their respective namespaces in parallel.
 ```bash
 $ ./batch/inject-all-scenarios.sh
 
-This script will inject failures in 14 namespaces:
+This script will inject failures in 11 namespaces:
   ✓ bank-of-springfield-20260102-100000
   ✓ bank-of-punxsutawney-20260102-100000
   ✓ bank-of-bedford-falls-20260102-100000
   ...
 
-Will inject failures in 14 namespace(s)
+Will inject failures in 11 namespace(s)
 Do you want to proceed? (y/n): y
 
 Injecting failures in parallel...
@@ -143,7 +141,7 @@ Starting: database-lock → bank-of-punxsutawney-20260102-100000
 ...
 
 Summary:
-Successfully injected: 14
+Successfully injected: 11
 Failed: 0
 ```
 
