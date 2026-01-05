@@ -168,8 +168,6 @@ action_inject() {
 
     # Prerequisite checks
     check_manifests
-    check_deployment
-    create_backup
 
     # Inject the failure
     echo ""
