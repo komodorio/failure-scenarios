@@ -26,6 +26,9 @@ deploy_to_namespace() {
     print_info "=========================================="
     echo ""
 
+    # Change to bank-of-anthos directory
+    cd "${SCRIPT_DIR}/../bank-of-anthos"
+
     # Check if namespace exists, create if it doesn't
     if ! kubectl get namespace "$namespace" >/dev/null 2>&1; then
         print_info "Namespace '${namespace}' does not exist. Creating it..."
@@ -35,34 +38,6 @@ deploy_to_namespace() {
         print_info "Namespace '${namespace}' already exists"
     fi
     echo ""
-
-    # Scenarios that don't require Bank of Anthos deployment
-    local skip_bank_of_anthos_scenarios=(
-        "availability-issue-bad-secret-change"
-        "cascade-failure-missing-configmap"
-        "cascade-relay-on-other-service"
-    )
-
-    # Check if this scenario should skip Bank of Anthos deployment
-    local skip_deployment=false
-    for skip_scenario in "${skip_bank_of_anthos_scenarios[@]}"; do
-        if [[ "$scenario" == "$skip_scenario" ]]; then
-            skip_deployment=true
-            break
-        fi
-    done
-
-    if [ "$skip_deployment" = true ]; then
-        print_info "Skipping Bank of Anthos deployment for scenario: ${scenario}"
-        print_info "This scenario deploys its own resources"
-        echo ""
-        print_success "Namespace ${namespace} is ready for scenario deployment"
-        echo ""
-        return 0
-    fi
-
-    # Change to bank-of-anthos directory
-    cd "${SCRIPT_DIR}/../bank-of-anthos"
 
     # Check if jwt-secret.yaml exists
     if [ ! -f "./extras/jwt/jwt-secret.yaml" ]; then
