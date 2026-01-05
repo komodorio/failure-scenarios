@@ -1,0 +1,6 @@
+apiVersion: v2
+name: cash-cache
+description: A Helm chart for Cash Cache Deployment
+type: application
+version: 0.2.0
+appVersion: "7.2"
