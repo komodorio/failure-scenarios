@@ -114,7 +114,7 @@ stringData:
     print("[allocator] Memory allocated successfully - 150MB", flush=True)
     print("[allocator] Service ready to process requests...", flush=True)
     # Keep it in memory
-    time.sleep(3600)
+    time.sleep(30)
 EOF
 
     print_success "Secret created successfully"
