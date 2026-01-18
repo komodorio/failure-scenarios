@@ -264,6 +264,33 @@ NAMESPACE="bad-deployment-scenario" ./scenarios/restore.sh
 
 **Revert**: Removes ResourceQuota and scales userservice back to 1
 
+---
+
+### 11. STRICT mTLS Mismatch (`mtls-mismatch-scenario.sh`)
+**Description**: Creates PeerAuthentication policy enforcing STRICT mTLS on userservice while DestinationRule disables TLS for accounts-db, causing mTLS handshake failures
+
+**Affected Services**:
+- userservice (requires STRICT mTLS, experiences connection failures)
+- accounts-db (TLS disabled via DestinationRule)
+- frontend (user operations fail with 503 errors)
+
+**Expected Behavior**:
+- mTLS handshake failures
+- TLS connection errors in Istio proxy logs
+- userservice readiness probe failures (if non-mTLS)
+- Pod becomes NotReady (0/1 or 0/2)
+- Service-to-service communication breaks
+- Frontend shows Service Unavailable errors
+
+**Prerequisites**:
+- Istio service mesh installed
+- Namespace has `istio-injection=enabled` label
+- Pods have Istio sidecar proxies
+
+**Revert**: Removes PeerAuthentication policy and DestinationRule, restarts userservice
+
+---
+
 ## Adding New Scenarios
 
 To add a new failure scenario:
